@@ -2,15 +2,8 @@ fastapi==0.129.0
 uvicorn==0.41.0
 python-multipart==0.0.22
 pydantic==2.12.5
-
+google-genai
 pdfplumber==0.11.9
-
-sentence-transformers
-torch
-scikit-learn
 numpy
-scipy
-tqdm
-
 requests==2.32.5
 python-dotenv==1.2.1

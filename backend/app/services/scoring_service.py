@@ -4,8 +4,16 @@ from app.services.experience_service import compute_experience_score
 
 
 def compute_ats_score(jd_text: str, resume_text: str):
-    # 1️⃣ Semantic similarity
-    semantic_score = compute_similarity(jd_text, resume_text)
+    # 1️⃣ Semantic similarity (raw cosine 0–1)
+    raw_similarity = compute_similarity(jd_text, resume_text)
+
+    # 🔧 Calibration threshold
+    threshold = 0.65
+
+    if raw_similarity < threshold:
+        semantic_score = 0
+    else:
+        semantic_score = (raw_similarity - threshold) / (1 - threshold)
 
     # 2️⃣ Skill match
     skill_score, matched_skills, missing_skills = compute_skill_match(

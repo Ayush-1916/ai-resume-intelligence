@@ -1,8 +1,8 @@
 import requests
 import json
+import re
 from app.config import GEMINI_API_KEY
 
-print("DEBUG API KEY:", GEMINI_API_KEY)
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent"
 
 
@@ -18,7 +18,10 @@ def generate_text(prompt: str):
                     {"text": prompt}
                 ]
             }
-        ]
+        ],
+        "generationConfig": {
+            "temperature": 0.2,  # Lower temperature = more deterministic JSON
+        }
     }
 
     response = requests.post(
@@ -34,8 +37,35 @@ def generate_text(prompt: str):
     return result["candidates"][0]["content"]["parts"][0]["text"]
 
 
+def safe_json_parse(raw_output: str):
+    """
+    Attempts to safely parse LLM JSON output.
+    Handles markdown wrapping and malformed outputs.
+    """
+
+    try:
+        return json.loads(raw_output)
+    except json.JSONDecodeError:
+        pass
+
+    # Remove markdown code fences if present
+    cleaned = re.sub(r"```json|```", "", raw_output).strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Final fallback: return structured wrapper
+        return {
+            "overall_assessment": raw_output,
+            "skill_improvements": [],
+            "experience_improvements": [],
+            "bullet_improvements": [],
+            "actionable_suggestions": []
+        }
+
 
 def generate_resume_feedback(jd_text: str, resume_text: str, ats_result: dict):
+
     prompt = f"""
 You are an AI hiring assistant.
 
@@ -43,7 +73,6 @@ You must strictly base your evaluation on the computed ATS analysis below.
 
 ===== ATS ANALYSIS =====
 Overall ATS Score: {ats_result["ats_score"]}%
-
 Semantic Similarity Score: {ats_result["breakdown"]["semantic_score"]}%
 Skill Match Score: {ats_result["breakdown"]["skill_score"]}%
 Experience Alignment Score: {ats_result["breakdown"]["experience_score"]}%
@@ -55,8 +84,6 @@ Matched Skills: {ats_result["matched_skills"]}
 Missing Skills: {ats_result["missing_skills"]}
 ========================
 
-Now evaluate the resume accordingly.
-
 Job Description:
 {jd_text}
 
@@ -64,13 +91,14 @@ Resume:
 {resume_text}
 
 IMPORTANT:
-- You MUST respect the experience mismatch if Resume Years < JD Required Years.
+- You MUST respect experience mismatch.
 - You MUST emphasize missing skills.
-- Do NOT contradict the ATS analysis.
+- Do NOT contradict ATS analysis.
 - Return ONLY valid JSON.
-- Do NOT include markdown or extra text.
+- No markdown.
+- No explanation outside JSON.
 
-Return strictly:
+Return strictly this format:
 
 {{
   "overall_assessment": "string",
@@ -83,10 +111,6 @@ Return strictly:
 
     raw_output = generate_text(prompt)
 
-    try:
-        return json.loads(raw_output)
-    except json.JSONDecodeError:
-        return {
-            "error": "Failed to parse LLM response",
-            "raw_output": raw_output
-        }
+    structured_output = safe_json_parse(raw_output)
+
+    return structured_output

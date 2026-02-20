@@ -12,17 +12,22 @@ async def analyze_resume(
     jd_text: str = Form(...)
 ):
     try:
-        # 1️⃣ Extract resume text
         resume_bytes = await resume.read()
         resume_text = extract_text_from_pdf(resume_bytes)
 
-        # 2️⃣ Compute ATS score
         ats_result = compute_ats_score(jd_text, resume_text)
 
-        # 3️⃣ Generate LLM feedback
-        feedback = generate_resume_feedback(jd_text, resume_text, ats_result)
+        try:
+            feedback = generate_resume_feedback(jd_text, resume_text, ats_result)
+        except Exception as llm_error:
+            feedback = {
+                "overall_assessment": "LLM feedback temporarily unavailable due to quota limits.",
+                "skill_improvements": [],
+                "experience_improvements": [],
+                "bullet_improvements": [],
+                "actionable_suggestions": []
+            }
 
-        # 4️⃣ Return unified response
         return {
             "ats_analysis": ats_result,
             "llm_feedback": feedback
